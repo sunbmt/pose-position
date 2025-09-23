@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <h2>🎥 Demo nhận diện tư thế bằng Teachable Machine</h2>
+  <h2>🎥 Demo nhận diện tư thế</h2>
   <div id="webcam-container"></div>
   <div id="label-container"></div>
 
@@ -27,10 +27,15 @@
       model = await tmImage.load(modelURL, metadataURL);
       maxPredictions = model.getTotalClasses();
 
-      // setup webcam
       const flip = true;
       webcam = new tmImage.Webcam(300, 300, flip);
-      await webcam.setup({ facingMode: "user" }); // "user" = camera trước, "environment" = sau
+      await webcam.setup({ facingMode: "user" }); 
+      // Patch cho iPhone
+      const video = webcam.webcam;
+      video.setAttribute("playsinline", true);
+      video.setAttribute("autoplay", true);
+      video.setAttribute("muted", true);
+
       await webcam.play();
       window.requestAnimationFrame(loop);
 
