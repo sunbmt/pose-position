@@ -1,34 +1,62 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
-  <title>Nhận diện tư thế TD</title>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+  <meta charset="UTF-8" />
+  <title>Nhận diện tư thế - Teachable Machine</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; }
+    #webcam-container { margin: 20px auto; }
+    video, canvas { border-radius: 10px; }
+  </style>
 </head>
 <body>
-  <h2>Nhận diện tư thế Thể dục</h2>
-  <div>📷 Camera:</div>
+  <h2>🎥 Demo nhận diện tư thế bằng Teachable Machine</h2>
   <div id="webcam-container"></div>
   <div id="label-container"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+  <script>
+    const URL = "https://teachablemachine.withgoogle.com/models/S1PHEYetx/";
+    let model, webcam, labelContainer, maxPredictions;
 
-<script>
-  const URL = "https://teachablemachine.withgoogle.com/models/S1PHEYetx/";
+    async function init() {
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
 
-  async function init() {
-    const modelURL = URL + "model.json";
-    const metadataURL = URL + "metadata.json";
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
 
-    model = await tmImage.load(modelURL, metadataURL);
-    webcam = new tmImage.Webcam(300, 300, true); 
-    await webcam.setup(); // popup hỏi quyền camera xuất hiện tại đây
-    await webcam.play();
-    document.getElementById("webcam-container").appendChild(webcam.canvas);
-  }
-  init();
-</script>
+      // setup webcam
+      const flip = true;
+      webcam = new tmImage.Webcam(300, 300, flip);
+      await webcam.setup({ facingMode: "user" }); // "user" = camera trước, "environment" = sau
+      await webcam.play();
+      window.requestAnimationFrame(loop);
 
+      document.getElementById("webcam-container").appendChild(webcam.canvas);
+      labelContainer = document.getElementById("label-container");
+      for (let i = 0; i < maxPredictions; i++) {
+        labelContainer.appendChild(document.createElement("div"));
+      }
+    }
+
+    async function loop() {
+      webcam.update();
+      await predict();
+      window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+      const prediction = await model.predict(webcam.canvas);
+      for (let i = 0; i < maxPredictions; i++) {
+        const classPrediction =
+          prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+        labelContainer.childNodes[i].innerHTML = classPrediction;
+      }
+    }
+
+    init();
+  </script>
 </body>
 </html>
-
