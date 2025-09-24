@@ -1,67 +1,42 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Nhận diện tư thế - Teachable Machine</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; }
-    #webcam-container { margin: 20px auto; }
-    video, canvas { border-radius: 10px; }
-  </style>
+  <meta charset="UTF-8">
+  <title>Nhận diện tiếng ồn</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/sound"></script>
 </head>
 <body>
-  <h2>🎥 Demo nhận diện tư thế</h2>
-  <div id="webcam-container"></div>
-  <div id="label-container"></div>
+  <h2>🎤 Nhận diện tiếng ồn bằng Teachable Machine</h2>
+  <button onclick="init()">Bật micro</button>
+  <p id="status">Chưa khởi động...</p>
+  <p id="label"></p>
+  <p id="confidence"></p>
 
-  <script>
-    const URL = "https://teachablemachine.withgoogle.com/models/S1PHEYetx/";
-    let model, webcam, labelContainer, maxPredictions;
+  <script type="text/javascript">
+    const URL = "https://teachablemachine.withgoogle.com/models/K9QZBfqg-/";
+    let model, microphone;
 
     async function init() {
+      document.getElementById("status").innerText = "Đang tải model...";
       const modelURL = URL + "model.json";
       const metadataURL = URL + "metadata.json";
 
-      model = await tmImage.load(modelURL, metadataURL);
-      maxPredictions = model.getTotalClasses();
+      const soundModel = await tmSound.load(modelURL, metadataURL);
+      microphone = await tmSound.createMicrophone();
+      await microphone.open(); // sẽ hiện hỏi Allow mic
 
-      const flip = true;
-      webcam = new tmImage.Webcam(300, 300, flip);
-      await webcam.setup({ facingMode: "user" }); 
-      // Patch cho iPhone
-      const video = webcam.webcam;
-      video.setAttribute("playsinline", true);
-      video.setAttribute("autoplay", true);
-      video.setAttribute("muted", true);
-
-      await webcam.play();
+      document.getElementById("status").innerText = "Micro đã bật, đang nhận diện...";
       window.requestAnimationFrame(loop);
 
-      document.getElementById("webcam-container").appendChild(webcam.canvas);
-      labelContainer = document.getElementById("label-container");
-      for (let i = 0; i < maxPredictions; i++) {
-        labelContainer.appendChild(document.createElement("div"));
+      async function loop() {
+        const prediction = await soundModel.predict(microphone);
+        let best = prediction.reduce((a, b) => a.probability > b.probability ? a : b);
+        document.getElementById("label").innerText = "Phát hiện: " + best.className;
+        document.getElementById("confidence").innerText = "Độ tin cậy: " + (best.probability * 100).toFixed(2) + "%";
+        window.requestAnimationFrame(loop);
       }
     }
-
-    async function loop() {
-      webcam.update();
-      await predict();
-      window.requestAnimationFrame(loop);
-    }
-
-    async function predict() {
-      const prediction = await model.predict(webcam.canvas);
-      for (let i = 0; i < maxPredictions; i++) {
-        const classPrediction =
-          prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-        labelContainer.childNodes[i].innerHTML = classPrediction;
-      }
-    }
-
-    init();
   </script>
 </body>
 </html>
