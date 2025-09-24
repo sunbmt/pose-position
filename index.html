@@ -2,15 +2,32 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <title>Nhận diện tiếng ồn</title>
-  <!-- TensorFlow.js -->
+  <title>Nhận diện tiếng ồn lớp học</title>
+  <!-- Thư viện TensorFlow.js -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0/dist/tf.min.js"></script>
-  <!-- Teachable Machine Audio -->
+  <!-- Thư viện Teachable Machine Audio -->
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/audio@0.8/dist/teachablemachine-audio.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    #label-container div {
+      margin: 5px;
+      font-size: 18px;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+  </style>
 </head>
 <body>
-  <h2>Nhận diện âm thanh lớp học</h2>
-  <button type="button" onclick="init()">Bắt đầu</button>
+  <h2>🎧 Nhận diện âm thanh lớp học</h2>
+  <button onclick="init()">Bắt đầu</button>
+  <button onclick="stop()">Dừng</button>
   <div id="label-container"></div>
 
   <script type="text/javascript">
@@ -26,6 +43,7 @@
       maxPredictions = model.getTotalClasses();
 
       labelContainer = document.getElementById("label-container");
+      labelContainer.innerHTML = ""; // Xóa nội dung cũ
       for (let i = 0; i < maxPredictions; i++) {
         labelContainer.appendChild(document.createElement("div"));
       }
@@ -37,10 +55,19 @@
       await model.listen(result => {
         for (let i = 0; i < maxPredictions; i++) {
           const classPrediction =
-            result[i].className + ": " + result[i].probability.toFixed(2);
+            result[i].className + ": " + (result[i].probability * 100).toFixed(1) + "%";
           labelContainer.childNodes[i].innerHTML = classPrediction;
         }
+      }, {
+        includeSpectrogram: true,
+        probabilityThreshold: 0.75
       });
+    }
+
+    function stop() {
+      if (model) {
+        model.stopListening();
+      }
     }
   </script>
 </body>
