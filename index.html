@@ -1,44 +1,47 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Nhận diện tiếng ồn</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/sound"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/sound@0.8/dist/teachablemachine-sound.min.js"></script>
+  <!-- TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0/dist/tf.min.js"></script>
+  <!-- Teachable Machine Audio -->
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/audio@0.8/dist/teachablemachine-audio.min.js"></script>
 </head>
 <body>
-  <h2>🎤 Nhận diện tiếng ồn bằng Teachable Machine</h2>
-  <button onclick="init()">Bật micro</button>
-  <p id="status">Chưa khởi động...</p>
-  <p id="label"></p>
-  <p id="confidence"></p>
+  <h2>Nhận diện âm thanh lớp học</h2>
+  <button type="button" onclick="init()">Bắt đầu</button>
+  <div id="label-container"></div>
 
   <script type="text/javascript">
     const URL = "https://teachablemachine.withgoogle.com/models/K9QZBfqg-/";
-    let model, microphone;
+
+    let model, labelContainer, maxPredictions;
 
     async function init() {
-      document.getElementById("status").innerText = "Đang tải model...";
       const modelURL = URL + "model.json";
       const metadataURL = URL + "metadata.json";
 
-      const soundModel = await tmSound.load(modelURL, metadataURL);
-      microphone = await tmSound.createMicrophone();
-      await microphone.open(); // sẽ hiện hỏi Allow mic
+      model = await tmAudio.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
 
-      document.getElementById("status").innerText = "Micro đã bật, đang nhận diện...";
-      window.requestAnimationFrame(loop);
-
-      async function loop() {
-        const prediction = await soundModel.predict(microphone);
-        let best = prediction.reduce((a, b) => a.probability > b.probability ? a : b);
-        document.getElementById("label").innerText = "Phát hiện: " + best.className;
-        document.getElementById("confidence").innerText = "Độ tin cậy: " + (best.probability * 100).toFixed(2) + "%";
-        window.requestAnimationFrame(loop);
+      labelContainer = document.getElementById("label-container");
+      for (let i = 0; i < maxPredictions; i++) {
+        labelContainer.appendChild(document.createElement("div"));
       }
+
+      listen();
+    }
+
+    async function listen() {
+      await model.listen(result => {
+        for (let i = 0; i < maxPredictions; i++) {
+          const classPrediction =
+            result[i].className + ": " + result[i].probability.toFixed(2);
+          labelContainer.childNodes[i].innerHTML = classPrediction;
+        }
+      });
     }
   </script>
 </body>
 </html>
-
