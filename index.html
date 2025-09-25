@@ -1,73 +1,55 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <title>Nhận diện tiếng ồn lớp học</title>
-  <!-- Thư viện TensorFlow.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0/dist/tf.min.js"></script>
-  <!-- Thư viện Teachable Machine Audio -->
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/audio@0.8/dist/teachablemachine-audio.min.js"></script>
+  <meta charset="UTF-8">
+  <title>Nhận diện âm thanh bằng Teachable Machine</title>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/sound@0.8.4/dist/teachablemachine-sound.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
       text-align: center;
-      padding: 20px;
+      padding-top: 50px;
     }
-    #label-container div {
-      margin: 5px;
-      font-size: 18px;
-    }
-    button {
-      margin: 10px;
-      padding: 10px 20px;
-      font-size: 16px;
+    #label {
+      font-size: 2em;
+      margin-top: 20px;
+      color: #2c3e50;
     }
   </style>
 </head>
 <body>
-  <h2>🎧 Nhận diện âm thanh lớp học</h2>
-  <button onclick="init()">Bắt đầu</button>
-  <button onclick="stop()">Dừng</button>
-  <div id="label-container"></div>
+  <h1>🎙️ Nhận diện âm thanh qua micro</h1>
+  <button onclick="init()">Bắt đầu nhận diện</button>
+  <div id="label">Đang chờ...</div>
 
-  <script type="text/javascript">
-    const URL = "https://teachablemachine.withgoogle.com/models/K9QZBfqg-/";
+  <script>
+    const URL = "https://teachablemachine.withgoogle.com/models/K9QZBfqg/";
 
-    let model, labelContainer, maxPredictions;
+    let model, microphone;
 
     async function init() {
+      document.getElementById("label").innerText = "Đang tải mô hình...";
       const modelURL = URL + "model.json";
       const metadataURL = URL + "metadata.json";
 
-      model = await tmAudio.load(modelURL, metadataURL);
-      maxPredictions = model.getTotalClasses();
+      model = await tmSound.load(modelURL, metadataURL);
+      microphone = await tmSound.createMicrophone();
+      await microphone.open();
 
-      labelContainer = document.getElementById("label-container");
-      labelContainer.innerHTML = ""; // Xóa nội dung cũ
-      for (let i = 0; i < maxPredictions; i++) {
-        labelContainer.appendChild(document.createElement("div"));
-      }
-
-      listen();
+      document.getElementById("label").innerText = "Đang nhận diện...";
+      loop();
     }
 
-    async function listen() {
-      await model.listen(result => {
-        for (let i = 0; i < maxPredictions; i++) {
-          const classPrediction =
-            result[i].className + ": " + (result[i].probability * 100).toFixed(1) + "%";
-          labelContainer.childNodes[i].innerHTML = classPrediction;
+    async function loop() {
+      const prediction = await model.predict(microphone);
+      let highest = prediction[0];
+      for (let i = 1; i < prediction.length; i++) {
+        if (prediction[i].probability > highest.probability) {
+          highest = prediction[i];
         }
-      }, {
-        includeSpectrogram: true,
-        probabilityThreshold: 0.75
-      });
-    }
-
-    function stop() {
-      if (model) {
-        model.stopListening();
       }
+      document.getElementById("label").innerText = `Âm thanh: ${highest.className} (${(highest.probability * 100).toFixed(2)}%)`;
+      requestAnimationFrame(loop);
     }
   </script>
 </body>
