@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <title>Nhận diện âm thanh bằng Teachable Machine</title>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/sound@0.8.4/dist/teachablemachine-sound.min.js"></script>
+  <script>
+  const tmSound = window.tmSound;
+</script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -32,7 +35,7 @@
       const modelURL = URL + "model.json";
       const metadataURL = URL + "metadata.json";
 
-      model = await tmSound.load(modelURL, metadataURL);
+      model = await tmSound.load(modelURL, metadataURL); // đúng là tmSound, nhưng cần đảm bảo thư viện đã được tải
       microphone = await tmSound.createMicrophone();
       await microphone.open();
 
