@@ -3,19 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pose Camera Switch</title>
+  <title>Teachable Machine Pose Model</title>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@0.8/dist/teachablemachine-pose.min.js"></script>
   <style>
     body {
       text-align: center;
-      background: #f0f0f0;
       font-family: sans-serif;
-      padding: 20px;
+      background: #f0f0f0;
+    }
+    canvas {
+      border-radius: 12px;
+      background: #000;
     }
     video {
-      width: 100%;
-      max-width: 480px;
-      border-radius: 12px;
-      background: black;
+      display: none;
     }
     button {
       margin: 10px;
@@ -35,28 +36,43 @@
 </head>
 <body>
 
-  <h2>🎥 Camera Pose Detector</h2>
-  <video id="webcam" autoplay playsinline muted></video><br>
-  <button onclick="init()">Bắt đầu (Camera Sau)</button>
-  <button onclick="switchCamera()">Đổi Camera</button>
+  <h2>🤖 Teachable Machine Pose Model</h2>
+  <video id="webcam" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas><br>
+  <button onclick="init()">🎥 Bắt đầu (Camera Sau)</button>
+  <button onclick="switchCamera()">🔄 Đổi Camera</button>
+
+  <div id="label-container"></div>
 
   <script>
-    let video;
+    const modelURL = "./model/model.json";
+    const metadataURL = "./model/metadata.json";
+    let model, webcam, ctx, labelContainer, maxPredictions;
     let stream;
-    let currentFacingMode = 'environment'; // Bắt đầu với camera sau
+    let currentFacingMode = 'environment';
     let cameraActive = false;
 
     async function init() {
       if (cameraActive) return;
       cameraActive = true;
 
-      video = document.getElementById('webcam');
+      console.log("🚀 Đang tải model...");
+      model = await tmPose.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+      console.log("✅ Model đã tải xong.");
+
+      labelContainer = document.getElementById("label-container");
+      labelContainer.innerHTML = "";
+      for (let i = 0; i < maxPredictions; i++) {
+        labelContainer.appendChild(document.createElement("div"));
+      }
+
       await startCamera(currentFacingMode);
+      loop();
     }
 
     async function startCamera(facingMode) {
       if (stream) {
-        // Dừng stream cũ nếu có
         stream.getTracks().forEach(track => track.stop());
       }
 
@@ -69,10 +85,12 @@
         }
       };
 
+      const video = document.getElementById("webcam");
+
       try {
         stream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (err) {
-        console.warn("⚠ Không thể dùng facingMode exact, thử lại với facingMode:", facingMode);
+        console.warn("⚠ Không thể dùng facingMode exact, thử lại...");
         constraints.video.facingMode = facingMode;
         stream = await navigator.mediaDevices.getUserMedia(constraints);
       }
@@ -85,6 +103,12 @@
         };
       });
 
+      const canvas = document.getElementById("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx = canvas.getContext("2d");
+
+      webcam = video;
       console.log(`✅ Camera ${facingMode === 'user' ? 'trước' : 'sau'} đã khởi động`);
     }
 
@@ -92,6 +116,34 @@
       currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
       console.log(`🔄 Chuyển sang camera ${currentFacingMode}`);
       await startCamera(currentFacingMode);
+    }
+
+    async function loop() {
+      if (!webcam || webcam.readyState < 2) {
+        requestAnimationFrame(loop);
+        return;
+      }
+
+      ctx.drawImage(webcam, 0, 0, webcam.videoWidth, webcam.videoHeight);
+      await predict();
+      requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+      const { pose, posenetOutput } = await model.estimatePose(webcam);
+      const prediction = await model.predict(posenetOutput);
+
+      for (let i = 0; i < maxPredictions; i++) {
+        const classPrediction =
+          prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+        labelContainer.childNodes[i].innerHTML = classPrediction;
+      }
+
+      if (pose) {
+        const minPartConfidence = 0.5;
+        tmPose.drawKeypoints(pose.keypoints, minPartConfidence, ctx);
+        tmPose.drawSkeleton(pose.keypoints, minPartConfidence, ctx);
+      }
     }
   </script>
 </body>
