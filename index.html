@@ -89,19 +89,22 @@
     const URL = "https://teachablemachine.withgoogle.com/models/Il0Hcg1fQ/";
     let model, webcam, ctx, labelContainer, maxPredictions;
 
+    // --- Hàm phát giọng nói ---
+// --- Hàm phát giọng nói + beep ---
+// --- Hàm phát giọng nói + beep ---
 
+let audioCtx; // giữ context toàn cục để không bị tắt ngay
 
-let audioCtx;
-
+// --- Hàm đọc giọng đã sửa ---
 let lastSpoken = { cui: 0, gio2tay: 0, unlock: 0 };
 function speak(text, id = "general") {
     const now = Date.now();
     if (!lastSpoken[id] || now - lastSpoken[id] > 4000) {
-
+        // Xoá hết queue cũ để không bị nuốt mất
         window.speechSynthesis.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = "en-US";
+        utterance.lang = "vi-VN";
         utterance.rate = 1;
         utterance.pitch = 1;
 
@@ -113,6 +116,10 @@ function speak(text, id = "general") {
     }
 }
 
+
+
+
+    // --- Hàm mở khóa âm thanh ---
     function unlockSpeech(message) {
         speak(message, "unlock");
     }
@@ -120,7 +127,7 @@ function speak(text, id = "general") {
 function normalizeClassName(name) {
     return name
         .toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // bỏ dấu
         .trim();
 }
 
@@ -139,34 +146,20 @@ function normalizeClassName(name) {
         }
     }
 
-async function startWebcam() {
-  try {
-    unlockSpeech("Hệ thống nhận diện tư thế đã khởi động");
-    await loadModel();
+    async function startWebcam() {
+        unlockSpeech("Hệ thống nhận diện tư thế đã khởi động");
+        await loadModel();
+        const flip = true;
+        webcam = new tmPose.Webcam(500, 500, flip);
+        await webcam.setup();
+        await webcam.play();
+        window.requestAnimationFrame(loop);
 
-    const flip = true;
-    webcam = new tmPose.Webcam(500, 500, flip);
-    await webcam.setup(); // xin quyền camera
-    await webcam.play();  // bật camera
-    setTimeout(() => window.requestAnimationFrame(loop), 500);
-
-    // thêm video vào trang để nhìn thấy hình ảnh
-    document.querySelector(".container").appendChild(webcam.canvas);
-
-    // đặt kích thước và context
-    const canvas = document.getElementById("canvas");
-    canvas.width = 500;
-    canvas.height = 500;
-    ctx = canvas.getContext("2d");
-
-    // bắt đầu vòng lặp nhận diện
-    setTimeout(() => window.requestAnimationFrame(loop), 500);
-  } catch (err) {
-    console.error(err);
-    alert("❌ Không thể truy cập camera. Hãy kiểm tra quyền hoặc thử chạy trên HTTPS/localhost.");
-  }
-}
-
+        const canvas = document.getElementById("canvas");
+        canvas.width = 500;
+        canvas.height = 500;
+        ctx = canvas.getContext("2d");
+    }
 
     async function loop() {
         webcam.update();
@@ -182,17 +175,18 @@ for (let i = 0; i < maxPredictions; i++) {
     const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
     labelContainer.childNodes[i].innerHTML = classPrediction;
 
+    // log tất cả class và xác suất
     console.log("Class:", prediction[i].className, "Prob:", prediction[i].probability.toFixed(2));
 
 const cls = normalizeClassName(prediction[i].className);
 
 if (cls === "cui" && prediction[i].probability > 0.8) {
     console.log("🚨 Phát hiện: CÚI (prob=" + prediction[i].probability.toFixed(2) + ")");
-    speak("You are stooping", "cui");
+    speak("Bạn đang cúi, hãy ngồi thẳng lưng", "cui");
 }
 if (cls === "gio 2 tay" && prediction[i].probability > 0.8) {
     console.log("🚨 Phát hiện: GIƠ 2 TAY (prob=" + prediction[i].probability.toFixed(2) + ")");
-    speak("You are raising both hands", "gio2tay");
+    speak("Bạn đang giơ hai tay, hãy hạ tay xuống", "gio2tay");
 }
 
 }
@@ -224,16 +218,17 @@ for (let i = 0; i < maxPredictions; i++) {
     const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
     labelContainer.childNodes[i].innerHTML = classPrediction;
 
+    // log tất cả class và xác suất
     console.log("Class:", prediction[i].className, "Prob:", prediction[i].probability.toFixed(2));
 const cls = normalizeClassName(prediction[i].className);
 
 if (cls === "cui" && prediction[i].probability > 0.8) {
     console.log("🚨 Phát hiện: CÚI (prob=" + prediction[i].probability.toFixed(2) + ")");
-    speak("You are stooping", "cui");
+    speak("Bạn đang cúi, hãy ngồi thẳng lưng", "cui");
 }
 if (cls === "gio 2 tay" && prediction[i].probability > 0.8) {
     console.log("🚨 Phát hiện: GIƠ 2 TAY (prob=" + prediction[i].probability.toFixed(2) + ")");
-    speak("You are raising both hands", "gio2tay");
+    speak("Bạn đang giơ hai tay, hãy hạ tay xuống", "gio2tay");
 }
 
 }
