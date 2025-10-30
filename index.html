@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Teachable Machine Pose Model</title>
   <style>
     body {
@@ -23,12 +23,15 @@
       text-align: center;
       box-shadow: 0 8px 20px rgba(0,0,0,0.3);
       backdrop-filter: blur(8px);
-      width: 350px;
+      width: 400px;
     }
 
-    h1 {
-      font-size: 22px;
-      margin-bottom: 20px;
+    canvas {
+      border-radius: 12px;
+      background: #fff;
+      margin: 15px 0;
+      width: 100%;
+      height: auto;
     }
 
     button {
@@ -48,37 +51,23 @@
       transform: scale(1.05);
     }
 
-    canvas {
-      border-radius: 12px;
-      background: #fff;
-      margin: 15px 0;
-      width: 100%;
-      max-width: 500px;
-      height: auto;
-    }
-
-    #label-container {
-      margin-top: 10px;
-      font-size: 14px;
-      text-align: left;
-    }
-
     #label-container div {
       background: rgba(0,0,0,0.3);
       margin: 4px 0;
       padding: 6px 10px;
       border-radius: 6px;
+      text-align: left;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Teachable Machine Pose Model</h1>
-    <button type='button' onclick='startWebcam()'>Start Webcam</button>
-    <button type='button' onclick='document.getElementById("imageInput").click()'>Upload Image</button>
+    <button onclick="init()">Start Webcam</button>
+    <button onclick="document.getElementById('imageInput').click()">Upload Image</button>
     <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="predictImage(event)">
-    <canvas id='canvas' width="500" height="500"></canvas>
-    <div id='label-container'></div>
+    <canvas id="canvas" width="500" height="500"></canvas>
+    <div id="label-container"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
@@ -88,98 +77,68 @@
     const URL = "https://teachablemachine.withgoogle.com/models/Il0Hcg1fQ/";
     let model, webcam, ctx, labelContainer, maxPredictions;
 
-    // --- Giọng nói ---
-    let lastSpoken = { cui: 0, gio2tay: 0, unlock: 0 };
-    function speak(text, id = "general") {
-      const now = Date.now();
-      if (!lastSpoken[id] || now - lastSpoken[id] > 4000) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = "vi-VN";
-        utterance.rate = 1;
-        utterance.pitch = 1;
-        window.speechSynthesis.speak(utterance);
-        lastSpoken[id] = now;
-      }
-    }
+    async function init() {
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
+      model = await tmPose.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
 
-    function unlockSpeech(message) {
-      speak(message, "unlock");
-    }
-
-    function normalizeClassName(name) {
-      return name.toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        .trim();
-    }
-
-    async function loadModel() {
-      if (!model) {
-        const modelURL = URL + "model.json";
-        const metadataURL = URL + "metadata.json";
-        model = await tmPose.load(modelURL, metadataURL);
-        maxPredictions = model.getTotalClasses();
-        labelContainer = document.getElementById("label-container");
-        labelContainer.innerHTML = "";
-        for (let i = 0; i < maxPredictions; i++) {
-          labelContainer.appendChild(document.createElement("div"));
-        }
-      }
-    }
-
-    async function startWebcam() {
-      unlockSpeech("Hệ thống nhận diện tư thế đã khởi động");
-      await loadModel();
-      const flip = true;
+      const flip = true; // lật hình theo chiều gương
       webcam = new tmPose.Webcam(500, 500, flip);
-      await webcam.setup();
-      await webcam.play();
+      await webcam.setup(); // xin quyền camera
+      await webcam.play();  // bắt đầu phát
+      window.requestAnimationFrame(loop);
 
       const canvas = document.getElementById("canvas");
       ctx = canvas.getContext("2d");
 
-      window.requestAnimationFrame(loop);
+      labelContainer = document.getElementById("label-container");
+      labelContainer.innerHTML = "";
+      for (let i = 0; i < maxPredictions; i++) {
+        labelContainer.appendChild(document.createElement("div"));
+      }
     }
 
     async function loop() {
-      webcam.update();
-      await predictWebcam();
+      webcam.update(); // cập nhật khung hình mới
+      await predict();
       window.requestAnimationFrame(loop);
     }
 
-    async function predictWebcam() {
-      // Hiển thị video webcam lên canvas
-      ctx.drawImage(webcam.canvas, 0, 0, ctx.canvas.width, ctx.canvas.height);
-
-      // Ước lượng tư thế
+    async function predict() {
       const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
       const prediction = await model.predict(posenetOutput);
 
-      // Vẽ skeleton
+      // hiển thị webcam + skeleton
+      ctx.drawImage(webcam.canvas, 0, 0);
       if (pose) {
-        const minConfidence = 0.5;
-        tmPose.drawKeypoints(pose.keypoints, minConfidence, ctx);
-        tmPose.drawSkeleton(pose.keypoints, minConfidence, ctx);
+        tmPose.drawKeypoints(pose.keypoints, 0.5, ctx);
+        tmPose.drawSkeleton(pose.keypoints, 0.5, ctx);
       }
 
-      // Hiển thị xác suất
+      // hiển thị kết quả
       for (let i = 0; i < maxPredictions; i++) {
-        const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+        const classPrediction =
+          prediction[i].className + ": " + prediction[i].probability.toFixed(2);
         labelContainer.childNodes[i].innerHTML = classPrediction;
-
-        const cls = normalizeClassName(prediction[i].className);
-        if (cls === "cui" && prediction[i].probability > 0.8) {
-          speak("Bạn đang cúi, hãy ngồi thẳng lưng", "cui");
-        }
-        if (cls === "gio 2 tay" && prediction[i].probability > 0.8) {
-          speak("Bạn đang giơ hai tay, hãy hạ tay xuống", "gio2tay");
-        }
       }
     }
 
     async function predictImage(event) {
-      await loadModel();
       const file = event.target.files[0];
       if (!file) return;
-
-      const
+      const img = new Image();
+      img.onload = async () => {
+        ctx.drawImage(img, 0, 0, 500, 500);
+        const { pose, posenetOutput } = await model.estimatePose(img);
+        const prediction = await model.predict(posenetOutput);
+        if (pose) {
+          tmPose.drawKeypoints(pose.keypoints, 0.5, ctx);
+          tmPose.drawSkeleton(pose.keypoints, 0.5, ctx);
+        }
+      };
+      img.src = URL.createObjectURL(file);
+    }
+  </script>
+</body>
+</html>
