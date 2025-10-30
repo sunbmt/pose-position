@@ -64,9 +64,10 @@
   <div class="container">
     <h1>Teachable Machine Pose Model</h1>
     <button onclick="init()">Start Webcam</button>
+    <button onclick="switchCamera()">Đổi camera trước/sau</button>
     <button onclick="document.getElementById('imageInput').click()">Upload Image</button>
     <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="predictImage(event)">
-    <canvas id="canvas" width="500" height="500"></canvas>
+    <canvas id="canvas" width="320" height="320"></canvas>
     <div id="label-container"></div>
   </div>
 
@@ -76,6 +77,8 @@
   <script>
     const URL = "https://teachablemachine.withgoogle.com/models/Il0Hcg1fQ/";
     let model, webcam, ctx, labelContainer, maxPredictions;
+    let facingMode = "user";
+    let lastPredictTime = 0;
 
     async function init() {
       const modelURL = URL + "model.json";
@@ -83,11 +86,10 @@
       model = await tmPose.load(modelURL, metadataURL);
       maxPredictions = model.getTotalClasses();
 
-      const flip = true; // lật hình theo chiều gương
-      webcam = new tmPose.Webcam(500, 500, flip);
-      await webcam.setup(); // xin quyền camera
-      await webcam.play();  // bắt đầu phát
-      window.requestAnimationFrame(loop);
+      const flip = (facingMode === "user");
+      webcam = new tmPose.Webcam(320, 320, flip);
+      await webcam.setup({ facingMode: facingMode });
+      await webcam.play();
 
       const canvas = document.getElementById("canvas");
       ctx = canvas.getContext("2d");
@@ -97,11 +99,23 @@
       for (let i = 0; i < maxPredictions; i++) {
         labelContainer.appendChild(document.createElement("div"));
       }
+
+      window.requestAnimationFrame(loop);
     }
 
-    async function loop() {
-      webcam.update(); // cập nhật khung hình mới
-      await predict();
+    async function switchCamera() {
+      facingMode = (facingMode === "user") ? "environment" : "user";
+      if (webcam) await webcam.stop();
+      await init();
+    }
+
+    async function loop(timestamp) {
+      webcam.update();
+      // Giới hạn nhận dạng mỗi 100ms
+      if (timestamp - lastPredictTime > 100) {
+        lastPredictTime = timestamp;
+        await predict();
+      }
       window.requestAnimationFrame(loop);
     }
 
@@ -109,14 +123,12 @@
       const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
       const prediction = await model.predict(posenetOutput);
 
-      // hiển thị webcam + skeleton
       ctx.drawImage(webcam.canvas, 0, 0);
       if (pose) {
         tmPose.drawKeypoints(pose.keypoints, 0.5, ctx);
         tmPose.drawSkeleton(pose.keypoints, 0.5, ctx);
       }
 
-      // hiển thị kết quả
       for (let i = 0; i < maxPredictions; i++) {
         const classPrediction =
           prediction[i].className + ": " + prediction[i].probability.toFixed(2);
@@ -129,7 +141,7 @@
       if (!file) return;
       const img = new Image();
       img.onload = async () => {
-        ctx.drawImage(img, 0, 0, 500, 500);
+        ctx.drawImage(img, 0, 0, 320, 320);
         const { pose, posenetOutput } = await model.estimatePose(img);
         const prediction = await model.predict(posenetOutput);
         if (pose) {
