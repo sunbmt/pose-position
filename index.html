@@ -77,7 +77,6 @@
     <button type='button' onclick='startWebcam()'>Start Webcam</button>
     <button type='button' onclick='document.getElementById("imageInput").click()'>Upload Image</button>
     <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="predictImage(event)">
-
     <canvas id='canvas' width="500" height="500"></canvas>
     <div id='label-container'></div>
   </div>
@@ -89,162 +88,98 @@
     const URL = "https://teachablemachine.withgoogle.com/models/Il0Hcg1fQ/";
     let model, webcam, ctx, labelContainer, maxPredictions;
 
-    // --- Hàm phát giọng nói ---
-// --- Hàm phát giọng nói + beep ---
-// --- Hàm phát giọng nói + beep ---
-
-let audioCtx; // giữ context toàn cục để không bị tắt ngay
-
-// --- Hàm đọc giọng đã sửa ---
-let lastSpoken = { cui: 0, gio2tay: 0, unlock: 0 };
-function speak(text, id = "general") {
-    const now = Date.now();
-    if (!lastSpoken[id] || now - lastSpoken[id] > 4000) {
-        // Xoá hết queue cũ để không bị nuốt mất
+    // --- Giọng nói ---
+    let lastSpoken = { cui: 0, gio2tay: 0, unlock: 0 };
+    function speak(text, id = "general") {
+      const now = Date.now();
+      if (!lastSpoken[id] || now - lastSpoken[id] > 4000) {
         window.speechSynthesis.cancel();
-
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "vi-VN";
         utterance.rate = 1;
         utterance.pitch = 1;
-
-        utterance.onstart = () => console.log("🔊 Bắt đầu phát:", text);
-        utterance.onend = () => console.log("✅ Kết thúc phát:", text);
-
         window.speechSynthesis.speak(utterance);
         lastSpoken[id] = now;
+      }
     }
-}
 
-
-
-
-    // --- Hàm mở khóa âm thanh ---
     function unlockSpeech(message) {
-        speak(message, "unlock");
+      speak(message, "unlock");
     }
 
-function normalizeClassName(name) {
-    return name
-        .toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // bỏ dấu
+    function normalizeClassName(name) {
+      return name.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         .trim();
-}
-
+    }
 
     async function loadModel() {
-        if (!model) {
-            const modelURL = URL + "model.json";
-            const metadataURL = URL + "metadata.json";
-            model = await tmPose.load(modelURL, metadataURL);
-            maxPredictions = model.getTotalClasses();
-            labelContainer = document.getElementById("label-container");
-            labelContainer.innerHTML = "";
-            for (let i = 0; i < maxPredictions; i++) {
-                labelContainer.appendChild(document.createElement("div"));
-            }
+      if (!model) {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+        model = await tmPose.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+        labelContainer = document.getElementById("label-container");
+        labelContainer.innerHTML = "";
+        for (let i = 0; i < maxPredictions; i++) {
+          labelContainer.appendChild(document.createElement("div"));
         }
+      }
     }
 
     async function startWebcam() {
-        unlockSpeech("Hệ thống nhận diện tư thế đã khởi động");
-        await loadModel();
-        const flip = true;
-        webcam = new tmPose.Webcam(500, 500, flip);
-        await webcam.setup();
-        await webcam.play();
-        window.requestAnimationFrame(loop);
+      unlockSpeech("Hệ thống nhận diện tư thế đã khởi động");
+      await loadModel();
+      const flip = true;
+      webcam = new tmPose.Webcam(500, 500, flip);
+      await webcam.setup();
+      await webcam.play();
 
-        const canvas = document.getElementById("canvas");
-        canvas.width = 500;
-        canvas.height = 500;
-        ctx = canvas.getContext("2d");
+      const canvas = document.getElementById("canvas");
+      ctx = canvas.getContext("2d");
+
+      window.requestAnimationFrame(loop);
     }
 
     async function loop() {
-        webcam.update();
-        await predictWebcam();
-        window.requestAnimationFrame(loop);
+      webcam.update();
+      await predictWebcam();
+      window.requestAnimationFrame(loop);
     }
 
     async function predictWebcam() {
-        const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
-        const prediction = await model.predict(posenetOutput);
+      // Hiển thị video webcam lên canvas
+      ctx.drawImage(webcam.canvas, 0, 0, ctx.canvas.width, ctx.canvas.height);
 
-for (let i = 0; i < maxPredictions; i++) {
-    const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-    labelContainer.childNodes[i].innerHTML = classPrediction;
+      // Ước lượng tư thế
+      const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
+      const prediction = await model.predict(posenetOutput);
 
-    // log tất cả class và xác suất
-    console.log("Class:", prediction[i].className, "Prob:", prediction[i].probability.toFixed(2));
+      // Vẽ skeleton
+      if (pose) {
+        const minConfidence = 0.5;
+        tmPose.drawKeypoints(pose.keypoints, minConfidence, ctx);
+        tmPose.drawSkeleton(pose.keypoints, minConfidence, ctx);
+      }
 
-const cls = normalizeClassName(prediction[i].className);
+      // Hiển thị xác suất
+      for (let i = 0; i < maxPredictions; i++) {
+        const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+        labelContainer.childNodes[i].innerHTML = classPrediction;
 
-if (cls === "cui" && prediction[i].probability > 0.8) {
-    console.log("🚨 Phát hiện: CÚI (prob=" + prediction[i].probability.toFixed(2) + ")");
-    speak("Bạn đang cúi, hãy ngồi thẳng lưng", "cui");
-}
-if (cls === "gio 2 tay" && prediction[i].probability > 0.8) {
-    console.log("🚨 Phát hiện: GIƠ 2 TAY (prob=" + prediction[i].probability.toFixed(2) + ")");
-    speak("Bạn đang giơ hai tay, hãy hạ tay xuống", "gio2tay");
-}
-
-}
-
-
-
+        const cls = normalizeClassName(prediction[i].className);
+        if (cls === "cui" && prediction[i].probability > 0.8) {
+          speak("Bạn đang cúi, hãy ngồi thẳng lưng", "cui");
         }
-        drawPose(pose, webcam.canvas);
-    
+        if (cls === "gio 2 tay" && prediction[i].probability > 0.8) {
+          speak("Bạn đang giơ hai tay, hãy hạ tay xuống", "gio2tay");
+        }
+      }
+    }
 
     async function predictImage(event) {
+      await loadModel();
+      const file = event.target.files[0];
+      if (!file) return;
 
-        await loadModel();
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const img = new Image();
-        img.onload = async () => {
-            const canvas = document.getElementById("canvas");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0);
-
-            const { pose, posenetOutput } = await model.estimatePose(img);
-            const prediction = await model.predict(posenetOutput);
-
-for (let i = 0; i < maxPredictions; i++) {
-    const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-    labelContainer.childNodes[i].innerHTML = classPrediction;
-
-    // log tất cả class và xác suất
-    console.log("Class:", prediction[i].className, "Prob:", prediction[i].probability.toFixed(2));
-const cls = normalizeClassName(prediction[i].className);
-
-if (cls === "cui" && prediction[i].probability > 0.8) {
-    console.log("🚨 Phát hiện: CÚI (prob=" + prediction[i].probability.toFixed(2) + ")");
-    speak("Bạn đang cúi, hãy ngồi thẳng lưng", "cui");
-}
-if (cls === "gio 2 tay" && prediction[i].probability > 0.8) {
-    console.log("🚨 Phát hiện: GIƠ 2 TAY (prob=" + prediction[i].probability.toFixed(2) + ")");
-    speak("Bạn đang giơ hai tay, hãy hạ tay xuống", "gio2tay");
-}
-
-}
-            drawPose(pose, img);
-        };
-        img.src = window.URL.createObjectURL(file);
-    }
-
-    function drawPose(pose, source) {
-        ctx.drawImage(source, 0, 0, ctx.canvas.width, ctx.canvas.height);
-        if (pose) {
-            const minPartConfidence = 0.5;
-            tmPose.drawKeypoints(pose.keypoints, minPartConfidence, ctx);
-            tmPose.drawSkeleton(pose.keypoints, minPartConfidence, ctx);
-        }
-    }
-  </script>
-</body>
-</html>
+      const
