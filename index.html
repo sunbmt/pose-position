@@ -85,22 +85,14 @@
       model = await tmPose.load(modelURL, metadataURL);
       maxPredictions = model.getTotalClasses();
 
-      const flip = currentFacingMode === "user"; // chỉ lật nếu camera trước
-      webcam = new tmPose.Webcam(500, 500, flip);
+      // khởi tạo webcam (tạm flip = false)
+      webcam = new tmPose.Webcam(500, 500, false);
+      await webcam.setup(); // xin quyền camera mặc định
 
-      // cấu hình camera sau làm mặc định
-      const constraints = {
-        video: { facingMode: { exact: currentFacingMode } }
-      };
+      // ép buộc dùng camera theo hướng đã chọn
+      await forceCameraFacing(currentFacingMode);
 
-      try {
-        await webcam.setup(constraints); // xin quyền camera
-      } catch (err) {
-        console.warn("⚠ Không thể chọn camera cụ thể, dùng mặc định.", err);
-        await webcam.setup();
-      }
-
-      await webcam.play();  // bắt đầu phát
+      await webcam.play();
       window.requestAnimationFrame(loop);
 
       const canvas = document.getElementById("canvas");
@@ -110,6 +102,26 @@
       labelContainer.innerHTML = "";
       for (let i = 0; i < maxPredictions; i++) {
         labelContainer.appendChild(document.createElement("div"));
+      }
+    }
+
+    async function forceCameraFacing(facingMode) {
+      // Dừng stream cũ nếu có
+      if (webcam && webcam.webcam && webcam.webcam.srcObject) {
+        webcam.webcam.srcObject.getTracks().forEach(t => t.stop());
+      }
+
+      try {
+        const constraints = {
+          video: { facingMode: { exact: facingMode }, width: 500, height: 500 }
+        };
+        const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+        webcam.webcam.srcObject = newStream;
+        console.log(`🎥 Đã chuyển sang camera: ${facingMode}`);
+      } catch (err) {
+        console.warn("⚠ Không thể truy cập camera cụ thể, dùng mặc định:", err);
+        const fallback = await navigator.mediaDevices.getUserMedia({ video: true });
+        webcam.webcam.srcObject = fallback;
       }
     }
 
@@ -137,17 +149,9 @@
     }
 
     async function switchCamera() {
-      // dừng webcam hiện tại nếu có
-      if (webcam && webcam.webcam && webcam.webcam.srcObject) {
-        webcam.webcam.srcObject.getTracks().forEach(track => track.stop());
-      }
-
-      // đổi chế độ camera
       currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
-      console.log(`🔄 Đang chuyển sang camera: ${currentFacingMode}`);
-
-      // khởi động lại webcam
-      await init();
+      console.log("🔄 Chuyển sang:", currentFacingMode);
+      await forceCameraFacing(currentFacingMode);
     }
 
     async function predictImage(event) {
