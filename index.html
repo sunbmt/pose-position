@@ -139,20 +139,34 @@ function normalizeClassName(name) {
         }
     }
 
-    async function startWebcam() {
-        unlockSpeech("Hệ thống nhận diện tư thế đã khởi động");
-        await loadModel();
-        const flip = true;
-        webcam = new tmPose.Webcam(500, 500, flip);
-        await webcam.setup();
-        await webcam.play();
-        window.requestAnimationFrame(loop);
+async function startWebcam() {
+  try {
+    unlockSpeech("Hệ thống nhận diện tư thế đã khởi động");
+    await loadModel();
 
-        const canvas = document.getElementById("canvas");
-        canvas.width = 500;
-        canvas.height = 500;
-        ctx = canvas.getContext("2d");
-    }
+    const flip = true;
+    webcam = new tmPose.Webcam(500, 500, flip);
+    await webcam.setup(); // xin quyền camera
+    await webcam.play();  // bật camera
+    setTimeout(() => window.requestAnimationFrame(loop), 500);
+
+    // thêm video vào trang để nhìn thấy hình ảnh
+    document.querySelector(".container").appendChild(webcam.canvas);
+
+    // đặt kích thước và context
+    const canvas = document.getElementById("canvas");
+    canvas.width = 500;
+    canvas.height = 500;
+    ctx = canvas.getContext("2d");
+
+    // bắt đầu vòng lặp nhận diện
+    setTimeout(() => window.requestAnimationFrame(loop), 500);
+  } catch (err) {
+    console.error(err);
+    alert("❌ Không thể truy cập camera. Hãy kiểm tra quyền hoặc thử chạy trên HTTPS/localhost.");
+  }
+}
+
 
     async function loop() {
         webcam.update();
