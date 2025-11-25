@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Pose iPhone Fix</title>
+<title>Pose Detection</title>
 
 <style>
     body {
         margin: 0;
         font-family: Arial;
-        background: #6a85e6;
+        background: linear-gradient(135deg, #74ABE2, #5563DE);
         height: 100vh;
         display: flex;
         justify-content: center;
@@ -39,6 +39,10 @@
         border-radius: 12px;
         background: white;
     }
+    #label-container div {
+        padding: 5px;
+        font-weight: bold;
+    }
 </style>
 </head>
 
@@ -47,7 +51,6 @@
     <h2>Pose Detection</h2>
 
     <button onclick="startCamera()">📷 Bật Camera Sau</button>
-
     <button onclick="document.getElementById('imgInput').click()">🖼 Upload Ảnh</button>
     <input id="imgInput" type="file" accept="image/*" style="display:none" onchange="predictImage(event)">
 
@@ -55,15 +58,15 @@
     <div id="label-container"></div>
 </div>
 
-<!-- TFJS + Pose -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@0.8.3/dist/teachablemachine-pose.min.js"></script>
 
 <script>
 const MODEL = "https://teachablemachine.withgoogle.com/models/fuyn1NA_G/";
 let model, webcam, ctx, maxPredictions, stream;
+let cameraInterval = null; // interval 2s
 
-// Load Model
+// Load model
 async function loadModel() {
     if (!model) {
         model = await tmPose.load(MODEL + "model.json", MODEL + "metadata.json");
@@ -76,15 +79,21 @@ async function loadModel() {
     }
 }
 
-// FIX cho iPhone: tạo video thủ công
+// Start camera (back camera)
 async function startCamera() {
     await loadModel();
 
+    // Stop previous stream & interval
     if (stream) {
         stream.getTracks().forEach(t => t.stop());
         stream = null;
     }
+    if (cameraInterval) {
+        clearInterval(cameraInterval);
+        cameraInterval = null;
+    }
 
+    // Start new stream
     stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" } },
         audio: false
@@ -95,7 +104,6 @@ async function startCamera() {
     video.autoplay = true;
     video.srcObject = stream;
 
-    // TẠO webcam tmPose thủ công
     webcam = new tmPose.Webcam(300, 300, true);
     webcam.webcam = video;
 
@@ -106,16 +114,26 @@ async function startCamera() {
     canvas.height = 300;
     ctx = canvas.getContext("2d");
 
-    requestAnimationFrame(loop);
+    // VẼ video liên tục
+    requestAnimationFrame(drawCameraLoop);
+
+    // CHẠY predict mỗi 2s
+    cameraInterval = setInterval(async () => {
+        await predictWebcam();
+    }, 2000);
 }
 
-async function loop() {
-    webcam.update();
-    await predictWebcam();
-    requestAnimationFrame(loop);
+// Vẽ video liên tục
+function drawCameraLoop() {
+    if (webcam && webcam.webcam.readyState === 4) {
+        ctx.drawImage(webcam.webcam, 0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+    requestAnimationFrame(drawCameraLoop);
 }
 
 async function predictWebcam() {
+    if (!webcam) return;
+
     const { pose, posenetOutput } = await model.estimatePose(webcam.webcam);
     const prediction = await model.predict(posenetOutput);
 
@@ -127,14 +145,19 @@ function updateLabels(pred) {
     const l = document.getElementById("label-container");
     for (let i = 0; i < pred.length; i++) {
         l.childNodes[i].innerHTML =
-            pred[i].className + ": " + pred[i].probability.toFixed(2);
+            pred[i].className + ": " + Math.round(pred[i].probability * 100) + "%";
     }
 }
 
-// Upload ảnh
+// Upload image
 async function predictImage(e) {
     await loadModel();
 
+    // Stop camera interval
+    if (cameraInterval) {
+        clearInterval(cameraInterval);
+        cameraInterval = null;
+    }
     if (stream) {
         stream.getTracks().forEach(t => t.stop());
         stream = null;
@@ -168,6 +191,5 @@ function drawPose(pose, source) {
     tmPose.drawSkeleton(pose.keypoints, 0.5, ctx);
 }
 </script>
-
 </body>
 </html>
