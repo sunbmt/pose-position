@@ -1,123 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pose Detector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+    body {
+        margin: 0;
+        font-family: 'Poppins', sans-serif;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        color: #fff;
+    }
+
+    .container {
+        width: 380px;
+        background: rgba(255,255,255,0.15);
+        padding: 25px;
+        border-radius: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        backdrop-filter: blur(10px);
+        text-align: center;
+    }
+
+    h2 {
+        font-weight: 600;
+        margin-bottom: 10px;
+        letter-spacing: 1px;
+    }
+
+    canvas {
+        width: 100%;
+        height: auto;
+        border-radius: 15px;
+        background: #fff;
+        margin-top: 15px;
+    }
+
+    .btn {
+        margin-top: 15px;
+        padding: 12px 18px;
+        border: none;
+        border-radius: 30px;
+        background: #ffffff33;
+        backdrop-filter: blur(5px);
+        color: #fff;
+        cursor: pointer;
+        font-size: 16px;
+        transition: 0.3s;
+        width: 100%;
+    }
+
+    .btn:hover {
+        background: #ffffff55;
+    }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.3.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@0.8/dist/teachablemachine-pose.min.js"></script>
+
+</head>
+<body>
+
+<div class="container">
+    <h2>Pose Detector</h2>
+
+    <button id="switchBtn" class="btn">Chuyển Camera</button>
+
+    <canvas id="canvas"></canvas>
+</div>
+
 <script>
-const MODEL_URL = "https://teachablemachine.withgoogle.com/models/fuyn1NA_G/";
+const URL = "https://teachablemachine.withgoogle.com/models/YOUR_MODEL/";
+let model, webcam, ctx, flip = true;
+let currentFacing = "user";  // user = camera trước
 
-let model, webcam, ctx, labelContainer, maxPredictions;
-let currentFacing = "environment"; // camera sau mặc định
-let stream = null;
+async function initCamera() {
+    if (webcam) await webcam.stop(); // tắt camera cũ
 
-// ----------------------------
-// LOAD MODEL
-// ----------------------------
-async function loadModel() {
-    if (!model) {
-        model = await tmPose.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-        maxPredictions = model.getTotalClasses();
+    webcam = new tmPose.Webcam(300, 300, flip);
 
-        labelContainer = document.getElementById("label-container");
-        labelContainer.innerHTML = "";
-        for (let i = 0; i < maxPredictions; i++) {
-            labelContainer.appendChild(document.createElement("div"));
-        }
-    }
-}
-
-// ----------------------------
-// START CAMERA (STREAM REAL)
-// ----------------------------
-async function init() {
-    await loadModel();
-
-    // Ngắt stream cũ (nếu có)
-    if (stream) {
-        stream.getTracks().forEach(t => t.stop());
-    }
-
-    // Lấy camera trước hoặc sau
-    stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: currentFacing },
-        audio: false
+    await webcam.setup({
+        video: { facingMode: currentFacing }
     });
 
-    const flip = true;
-    webcam = new tmPose.Webcam(300, 300, flip);
-    await webcam.setup();
-    webcam.webcam.srcObject = stream;
-
     await webcam.play();
-    window.requestAnimationFrame(loop);
+}
+
+async function init() {
+    model = await tmPose.load(URL + "model.json", URL + "metadata.json");
+
+    await initCamera();
 
     const canvas = document.getElementById("canvas");
     canvas.width = 300;
     canvas.height = 300;
     ctx = canvas.getContext("2d");
-}
 
-// ----------------------------
-// SWITCH CAMERA
-// ----------------------------
-async function switchCamera() {
-    currentFacing = currentFacing === "environment" ? "user" : "environment";
-    await init();
-}
-
-// ----------------------------
-async function loop() {
-    webcam.update();
-    await predictWebcam();
     window.requestAnimationFrame(loop);
 }
 
-async function predictWebcam() {
-    const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
-    const prediction = await model.predict(posenetOutput);
-
-    for (let i = 0; i < maxPredictions; i++) {
-        labelContainer.childNodes[i].innerHTML =
-            prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-    }
-
-    drawPose(pose, webcam.canvas);
+async function loop() {
+    webcam.update();
+    drawCamera();
+    window.requestAnimationFrame(loop);
 }
 
-// ----------------------------
-// PREDICT IMAGE
-// ----------------------------
-async function predictImage(event) {
-    await loadModel();
-
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const img = new Image();
-    img.onload = async () => {
-        const canvas = document.getElementById("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-
-        ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-
-        const { pose, posenetOutput } = await model.estimatePose(img);
-        const prediction = await model.predict(posenetOutput);
-
-        for (let i = 0; i < maxPredictions; i++) {
-            labelContainer.childNodes[i].innerHTML =
-                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-        }
-
-        drawPose(pose, img);
-    };
-
-    img.src = window.URL.createObjectURL(file);
+function drawCamera() {
+    ctx.drawImage(webcam.canvas, 0, 0);
 }
 
-// ----------------------------
-function drawPose(pose, source) {
-    ctx.drawImage(source, 0, 0, ctx.canvas.width, ctx.canvas.height);
-    if (pose) {
-        const minPartConfidence = 0.5;
-        tmPose.drawKeypoints(pose.keypoints, minPartConfidence, ctx);
-        tmPose.drawSkeleton(pose.keypoints, minPartConfidence, ctx);
-    }
-}
+// NÚT CHUYỂN CAMERA
+document.getElementById("switchBtn").addEventListener("click", async () => {
+    currentFacing = currentFacing === "user" ? "environment" : "user";
+    await initCamera();
+});
+
+// START APP
+init();
 </script>
+
+</body>
+</html>
