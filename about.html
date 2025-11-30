@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Giới Thiệu - Dự Án AI</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* CSS Đồng bộ vs Index  */
+        body{font-family:'Segoe UI',sans-serif;background:#f0f4f8;margin:0;display:flex;flex-direction:column;min-height:100vh;color:#333}
+        header{background:#fff;padding:15px 30px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+        .logo{color:#3b82f6;font-weight:700;font-size:1.4rem;display:flex;gap:10px}
+        nav a{text-decoration:none;color:#666;margin-left:20px;transition:0.3s} nav a:hover,nav a.active{color:#3b82f6;font-weight:700}
+        
+        main{flex:1;display:flex;flex-direction:column;align-items:center;padding:30px 15px}
+        .card{background:#fff;border-radius:16px;padding:40px;width:100%;max-width:700px;box-shadow:0 8px 20px rgba(0,0,0,.08);line-height:1.6}
+        
+        h1{color:#3b82f6;margin:0 0 10px;text-align:center;font-size:1.8rem}
+        .subtitle{text-align:center;color:#666;margin-bottom:30px;font-style:italic}
+        
+        h2{color:#2c3e50;border-bottom:2px solid #eee;padding-bottom:10px;margin-top:30px;font-size:1.3rem} h2:first-of-type{margin-top:0}
+        ul{padding-left:20px} li{margin-bottom:10px}
+        
+        footer{font-size:.9rem;color:#888;text-align:center;padding:20px;background:#fff;margin-top:auto}
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo"><i class="fa-solid fa-person-rays"></i> Pose Classifier</div>
+        <nav>
+            <a href="index.html">Trang Chủ</a>
+            <a href="about.html" class="active">Giới Thiệu</a>
+        </nav>
+    </header>
+
+    <main>
+        <div class="card">
+            <h1>Về Dự Án</h1>
+
+            <h2>Tổng quan</h2>
+            <p>Dự án được xây dựng nhằm hỗ trợ học sinh điều chỉnh tư thế ngồi học, giúp phòng tránh các bệnh học đường như cong vẹo cột sống và cận thị.</p>
+
+            <h2>Công nghệ sử dụng</h2>
+            <ul>
+                <li><strong>Nền tảng:</strong> Teachable Machine của Google.</li>
+                <li><strong>Mô hình:</strong> Pose Project (Nhận diện khung xương).</li>
+                <li><strong>Thư viện:</strong> TensorFlow.js để chạy trực tiếp trên web.</li>
+            </ul>
+        </div>
+    </main>
+
+    <footer>&copy; 2025 Dự án AI Giám Sát Tư Thế. Thực hiện bởi Lê Hưng và Lê Dũng.</footer>
+
+</body>
+</html>
